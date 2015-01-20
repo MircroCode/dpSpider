@@ -1,0 +1,154 @@
+#!/usr/local/bin/python
+#-*-coding:utf8-*-
+__author__ = 'youjiezeng'
+import random
+from scrapy.spider import BaseSpider
+from scrapy.spider import Spider
+from scrapy.contrib.spiders import CrawlSpider
+from scrapy.selector import HtmlXPathSelector
+from scrapy.http import Request
+from scrapy.http import Response
+from scrapy.contrib.linkextractors.sgml import SgmlLinkExtractor
+import sys
+sys.path.append('../items')
+reload(sys)
+from scrapy.contrib.downloadermiddleware.useragent import UserAgentMiddleware
+try:
+    from dianping.items import DianpingItem
+except Exception,e:
+    print e
+import re
+from scrapy.exceptions import CloseSpider
+from scrapy.selector import Selector
+
+'''
+this is a way to run spider in cmdline
+scrapy runspider my_spider.py
+
+优化点：
+1. 启动爬虫间隔
+2. 启动cookie，防止被ban
+3. 随机切换user-agent，防止被ban
+4. 将编码任务切换到pipeline中
+'''
+
+
+class RotateUserAgentMiddleware(UserAgentMiddleware):
+    def __init__(self, user_agent=''):
+        self.user_agent = user_agent
+
+    def process_request(self, request, spider):
+        #这句话用于随机选择user-agent
+        ua = random.choice(self.user_agent_list)
+        if ua:
+            request.headers.setdefault('User-Agent', ua)
+            print '********user-agent:',ua
+
+    #the default user_agent_list composes chrome,I E,firefox,Mozilla,opera,netscape
+    #for more user agent strings,you can find it in http://www.useragentstring.com/pages/useragentstring.php
+    user_agent_list = [\
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1"\
+        "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11",\
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6",\
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6",\
+        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1",\
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5",\
+        "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5",\
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",\
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",\
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3",\
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",\
+        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
+       ]
+
+
+
+
+
+'''
+It’s a derived class of BaseSpider which has three fields and one method (all are required):
+
+name: name of your spider, which is use to launch the spider (will mention later). You can name it whatever you want. According to my taste, I will call it “nettuts”.
+allowed_domains: a list of domains on which the crawler crawling. Every domains which are not in this list are not available for crawling.
+start_urls: a list of URLs, which will be the roots of later crawls.
+parse(self, response): main method which is invoked by BaseSpider and contains main logic of our crawler.'''
+class DpSpider(BaseSpider):
+    from scrapy.contrib.spiders import Rule
+    from scrapy.contrib.linkextractors.lxmlhtml import LxmlParserLinkExtractor
+    name = 'dianping'
+    allowed_domains = ['dianping.com']
+    start_urls = ['http://www.dianping.com/search/category/2/20/g120r1481']
+    # rules = [Rule(LxmlParserLinkExtractor(['shop/\d+']), 'parse')]
+    # rules = [Rule(SgmlLinkExtractor(allow=('/shop'),
+    #                                         restrict_xpaths=('//@href')), callback='parse',
+    #                       follow=True)]
+
+    def parse(self, response):
+
+        shop = DianpingItem()
+        status_code = response.status
+        if status_code == 403: #当爬虫被禁时，关闭爬虫
+            raise CloseSpider('========   SPIDER WAS FORBIDDEN  =========')
+
+        # htmlData = HtmlXPathSelector(response)
+
+        # shop_names = htmlData.select('//h1[@class="shop-name"]/text()').extract()
+        # street_addresses = htmlData.select('//span[@itemprop="street-address"]/text()').extract()
+        # shop_tels = htmlData.select('//span[@class="info-name" and text()="'+u"电话："+'"]/../text()[2]').extract()
+        # open_times = htmlData.select('//p[@class="info info-indent"]/span[text()="'+u"营业时间："+'"]/../span[2]/text()').extract()
+        # shop_tags = htmlData.select('//span[@class=item]/a[@rel="tag"]/text()').extract()
+        # scripts = htmlData.select('//script/text()').extract()
+        # urls = htmlData.select('//attribute::href').extract()
+
+        htmlData = Selector(response)
+
+        shop_names = htmlData.xpath('//h1[@class="shop-name"]/text()').extract()
+        street_addresses = htmlData.xpath('//span[@itemprop="street-address"]/text()').extract()
+        shop_tels = htmlData.xpath('//span[@class="info-name" and text()="'+u"电话："+'"]/../text()[2]').extract()
+        open_times = htmlData.xpath('//p[@class="info info-indent"]/span[text()="'+u"营业时间："+'"]/../span[2]/text()').extract()
+        shop_tags = htmlData.xpath('//span[@class=item]/a[@rel="tag"]/text()').extract()
+        scripts = htmlData.xpath('//script/text()').extract()
+        urls = htmlData.xpath('//attribute::href').extract()
+
+        #爬取的数据中，有大量的换行符以及“号，在这里清洗掉
+        shop['shop_name'] = str(shop_names[0].encode('utf8')).replace("\n",' ').strip("\"").strip() if len(shop_names)>0 else ''
+        shop['street_address'] = str(street_addresses[0].encode('utf8')).replace("\n",' ').strip("\"").strip() if len(street_addresses)>0 else ''
+        shop['shop_tel'] = str(shop_tels[0].encode('utf8')).replace("\n",' ').strip("\"").strip() if len(shop_tels)>0 else ''
+        shop['open_time'] = str(open_times[0].encode('utf8')).replace("\n",' ').strip("\"").strip() if len(open_times)>0 else ''
+        shop['shop_tag'] = str(shop_tags[0].encode('utf8')).replace("\n",' ').strip("\"").strip() if len(shop_tags)>0 else ''
+
+
+        pat = re.compile('lng:[0-9.]+,lat:[0-9.]+')
+        latAndLngList = [pat.findall(src)[0] for src in scripts if pat.findall(src)]
+        latAndLng = latAndLngList[0] if len(latAndLngList)>0 else ''
+        latIdx = latAndLng.find('lat:')
+        lat = latAndLng[latIdx+4:]
+        lng = latAndLng[4:latIdx-1]
+        shop['shop_lat'] = lat
+        shop['shop_lng'] = lng
+        if lat != '' and lng != '':
+            yield shop
+
+        currentUrl = response.url
+        domainUrl = 'http://www.dianping.com'
+        # urls = htmlData.select('//@href').extract()
+        urlPattern = re.compile('shop/[0-9]+')
+
+        # for url in urls:
+        #     if not urlPattern.findall(url):
+        #         continue
+        #     if str(url.encode('utf8')).startswith('http'):
+        #         pass
+        #     elif str(url.encode('utf8')).startswith('/'):
+        #         url = domainUrl+url
+        #     else:
+        #         url = currentUrl + url
+        #     print '------------url:',url
+        #     yield Request(url,callback=self.parse)
+
