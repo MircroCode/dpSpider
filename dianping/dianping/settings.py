@@ -22,7 +22,7 @@ DOWNLOADER_MIDDLEWARES = {
 ITEM_PIPELINES = {'dianping.pipelines.DianpingPipeline': 1}
 DOWNLOAD_DELAY = 0.50 #250ms
 COOKIES_ENABLED = False
-#DepthMiddleware
-DEPTH_LIMIT=0 #The maximum depth that will be allowed to crawl for any site. If zero, no limit will be imposed.
+# DepthMiddleware.  The maximum depth that will be allowed to crawl for any site. If zero, no limit will be imposed.
+DEPTH_LIMIT = 2  #just spider clothes
 HTTPERROR_ALLOWED_CODES=[403] #spider was forbidden
 CRAWLSPIDER_FOLLOW_LINKS=True
