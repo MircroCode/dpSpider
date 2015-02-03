@@ -9,9 +9,13 @@ import json
 
 class DianpingPipeline(object):
     def __init__(self):
-        self.file = codecs.open('DianpingData.json', mode='wb', encoding='utf-8')
+        self.file = codecs.open('shop_data.json', mode='wb', encoding='utf-8')
     def process_item(self, item, spider):
-        line = json.dumps(dict(item)) + '\n'
+        t = {}
+        for k, v in dict(item).items():
+            v = ' '.join(v).strip('\r\n').strip('\n').strip().replace('\r\n', ' ').replace('\n', ' ')
+            t[k] = v
+        line = json.dumps(t) + '\n'
         self.file.write(line.decode("unicode_escape"))
         return item
     def open_spider(self,spider):
